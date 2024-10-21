@@ -1,0 +1,238 @@
+<html>
+<head>
+<title>Mode7 - Canvas2D</title>
+<style>
+table, td {
+	border-spacing:0; /* Removes the cell spacing via CSS */
+	border-collapse: collapse;
+}
+td {
+	border: 0px solid blue;
+	background-color: yellow;
+}
+</style>
+<script>
+var pal = ["880015","5E000E","B7001C"];
+var pTexture = [
+0,0,0,0,1,0,0,0,
+0,0,0,0,1,0,0,0,
+2,2,2,2,1,2,2,2,
+1,1,1,1,1,1,1,1,
+1,0,0,0,0,0,0,0,
+1,0,0,0,0,0,0,0,
+1,2,2,2,2,2,2,2,
+1,1,1,1,1,1,1,1
+];
+var textureW = 8;
+var textureH = 8;
+var screenW, screenH, centerH;
+
+// 0.017453292519943295 1
+// 0.7853981633974483 45
+// 1.570796 90
+// 2.356194 135
+// 3.141592 180 PI
+// 3.92699 225
+// 4.712388 270
+// 5.497786 315 FaceUP
+// 6.283185307179586 360
+
+var qPI = 0.7853981633974483; // 1/4 of the number PI
+var angle = qPI*7; // FaceUP in Game
+var angLmt = qPI*8; // Equivalent to 360 degrees
+
+var scaleX, scaleY, scaleL, moveX, moveY, fog;
+function Render() {
+	var y2=1, x2=1;
+	var cos = Math.cos(angle);
+	var sin = Math.sin(angle);
+	var z = -centerH;
+	var d, p;
+	y = 0;
+	
+	if (scaleX < 1) {
+		scaleX = 1;
+	}
+	if (scaleY < 1) {
+		scaleY = 1;
+	}
+	if (scaleX > scaleL) {
+		scaleX = scaleL;
+	}
+	if (scaleY > scaleL) {
+		scaleY = scaleL;
+	}
+	
+	while (y < screenH) {
+		x = 0;
+		while (x < screenW) {
+			y2 = ((screenW - x) * cos - x * sin) / z;
+			x2 = ((screenW - x) * sin + x * cos) / z;
+			if (z < 0) {
+				x2 -= (moveX/scaleX);
+				y2 -= (moveY/scaleY);
+			} else {
+				x2 += (moveX/scaleX);
+				y2 += (moveY/scaleY);
+			}
+			if (y2 < 0) {
+				y2 *= -1;
+			}
+			if (x2 < 0) {
+				x2 *= -1;
+			}
+			y2 *= scaleY;
+			x2 *= scaleX;
+
+			x2 %= textureW;
+			y2 %= textureH;
+			
+			d = pTexture[(Math.floor(x2) + Math.floor(y2) * textureW)];
+			p = ((x*4)+(y*4)*screenW); //4 bytes
+			
+			/*imgData.data[ p ] = parseInt("0x"+pal[d].slice(0,2))-((scaleX*255)/(z*2)); //R
+			imgData.data[p+1] = parseInt("0x"+pal[d].slice(2,4))-((scaleX*255)/(z*2)); //G
+			imgData.data[p+2] = parseInt("0x"+pal[d].slice(4,6))+((scaleX*255)/(z*2)); //B*/
+			
+			fog = (((255/scaleY)/z)*(centerH/z))/32; //(16/255*scaleY); //((255/16)*(scaleX/z));
+			if (y > centerH) {
+				imgData.data[ p ] = parseInt("0x"+pal[d].slice(0,2))+fog; //R
+				imgData.data[p+1] = parseInt("0x"+pal[d].slice(2,4))+fog; //G
+				imgData.data[p+2] = parseInt("0x"+pal[d].slice(4,6))+fog; //B
+			} else {
+				imgData.data[ p ] = parseInt("0x"+bgcanvas[0])+fog; //R
+				imgData.data[p+1] = parseInt("0x"+bgcanvas[1])+fog; //G
+				imgData.data[p+2] = parseInt("0x"+bgcanvas[2])+fog; //B
+			}
+			//imgData.data[p+3] = (z*scaleX)-(255/z); //A
+			
+			/*let hex = parseInt(pal[d], 16)
+			imgData.data[p]   = (hex >> 16) & 0xFF; // R
+			imgData.data[p+1] = (hex >> 8) & 0xFF;  // G
+			imgData.data[p+2] = hex & 0xFF;         // B*/
+			
+			x++;
+		}
+		y++;
+		z++;
+	}
+	ctx.putImageData(imgData, 0, 0);
+	
+	if (kboard["87"]) {
+		/*W*/
+		moveX += Math.sin(angle + qPI) //* (scaleX*2);
+		moveY += Math.cos(angle + qPI) //* (scaleY*2);
+	}
+	if (kboard["83"]) {
+		/*S*/
+		moveX -= Math.sin(angle + qPI) //* (scaleX*2);
+		moveY -= Math.cos(angle + qPI) //* (scaleY*2);
+	}
+	if (kboard["65"]) {
+		/*A*/
+		angle -= 0.2;
+	}
+	if (kboard["68"]) {
+		/*D*/
+		angle += 0.2;
+	}
+	if (kboard["38"]) {
+		/*ArrowUp*/
+		scaleY += 1;
+	}
+	if (kboard["40"]) {
+		/*ArrowDown*/
+		scaleY -= 1;
+	}
+	if (kboard["37"]) {
+		/*ArrowLeft*/
+		scaleX += 1;
+	}
+	if (kboard["39"]) {
+		/*ArrowRight*/
+		scaleX -= 1;
+	}
+	if (kboard["deltaY"] < 0) {
+		if (scale < 6) {
+			scaleX += 0.2;
+			scaleY += 0.2;
+			scale++;
+		} else {
+			kboard["deltaY"] = 0;
+		}
+	}
+	if (kboard["deltaY"] > 0) {
+		if (scale > -6) {
+			scaleX -= 0.2;
+			scaleY -= 0.2;
+			scale--;
+		} else {
+			kboard["deltaY"] = 0;
+		}
+	}
+}
+
+var loop, ctx;
+var kboard = {"w":0,"s":0,"a":0,"d":0,"ArrowUp":0,"ArrowDown":0,"deltaX":0,"deltaY":0};
+var scale = 0;
+var bgcanvas = ["8C","92","FF"];
+function Main() {
+	// Var Scale
+	scaleX = 16;
+	scaleY = 16;
+	scaleL = scaleX*10;
+	
+	// Center Tile 0x0 + loop map
+	moveX = (textureW*2)+8;
+	moveY = ((textureH*2)+8) * -1;
+	
+	var canvas = document.getElementById("screen");
+	screenW = canvas.width;
+	screenH = canvas.height;
+	centerH = screenH/2;
+    ctx = canvas.getContext("2d");
+	ctx.fillStyle = "#"+bgcanvas[0]+bgcanvas[1]+bgcanvas[2]; //Background color
+	ctx.fillRect(0, 0, screenW, screenH); // Draw background
+	imgData = ctx.getImageData(0, 0, screenW, screenH);
+
+	document.body.addEventListener("keydown", function (e) {
+		kboard[e.keyCode] = 1;
+	});
+
+	document.body.addEventListener("keyup", function (e) {
+		kboard[e.keyCode] = 0;
+	});
+	
+	document.body.addEventListener('wheel', function(e){
+		if (e.deltaY < 0) {
+			/*scaleX += 0.2;
+			scaleY += 0.2;*/
+		}
+		if (e.deltaY > 0) {
+			/*scaleX -= 0.2;
+			scaleY -= 0.2;*/
+			
+		}
+		scale = 0;
+		kboard["deltaY"] = Math.sign(e.deltaY);
+		//console.log(Math.sign(event.deltaY))
+	});
+	loop = setInterval(Render, 30);
+}
+
+</script>
+</head>
+<body onload="Main()">
+<canvas id="screen" width="640", height="480"></canvas>
+<pre>
+Forward: W
+Back: S
+Rotate Left: A
+Rotate Right: D
+WheelUp: Further (Scale)
+WheelDown : Closer (Scale)
+ArrowUP/ArrowDow : Further (ScaleY)
+ArrowLeft/ArrowRight : Further (ScaleX)
+</pre>
+</body>
+</html>
